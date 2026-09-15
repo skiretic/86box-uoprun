@@ -987,16 +987,15 @@ writememwl(uint32_t addr, uint16_t val)
             cycles -= timing_misaligned;
         if ((addr & 0xfff) > 0xffe) {
             if (cr0 >> 31) {
+                /* Translate every page, including one with a page_lookup entry:
+                   writing the first half can recycle that entry (addwritelookup's
+                   ring), and the second half then falls back to addr64a[]. */
                 for (uint8_t i = 0; i < 2; i++) {
-                    /* Do not translate a page that has a valid lookup, as that is by definition valid
-                       and the whole purpose of the lookup is to avoid repeat identical translations. */
-                    if (!page_lookup[(addr + i) >> 12] || !page_lookup[(addr + i) >> 12]->write_b) {
-                        a          = mmutranslate_write(addr + i);
-                        addr64a[i] = (uint32_t) a;
+                    a          = mmutranslate_write(addr + i);
+                    addr64a[i] = (uint32_t) a;
 
-                        if (a > 0xffffffffULL)
-                            return;
-                    }
+                    if (a > 0xffffffffULL)
+                        return;
                 }
             }
 
@@ -1245,28 +1244,27 @@ writememll(uint32_t addr, uint32_t val)
             cycles -= timing_misaligned;
         if ((addr & 0xfff) > 0xffc) {
             if (cr0 >> 31) {
+                /* Translate every page, including one with a page_lookup entry:
+                   writing the first half can recycle that entry (addwritelookup's
+                   ring), and the second half then falls back to addr64a[]. */
                 for (i = 0; i < 4; i++) {
-                    /* Do not translate a page that has a valid lookup, as that is by definition valid
-                       and the whole purpose of the lookup is to avoid repeat identical translations. */
-                    if (!page_lookup[(addr + i) >> 12] || !page_lookup[(addr + i) >> 12]->write_b) {
-                        if (i == 0) {
-                            a          = mmutranslate_write(addr + i);
-                            addr64a[i] = (uint32_t) a;
-                        } else if (!((addr + i) & 0xfff)) {
-                            a          = mmutranslate_write(addr + 3);
-                            addr64a[i] = (uint32_t) a;
-                            if (!cpu_state.abrt) {
-                                a          = (a & ~0xfffLL) | ((uint64_t) ((addr + i) & 0xfff));
-                                addr64a[i] = (uint32_t) a;
-                            }
-                        } else {
+                    if (i == 0) {
+                        a          = mmutranslate_write(addr + i);
+                        addr64a[i] = (uint32_t) a;
+                    } else if (!((addr + i) & 0xfff)) {
+                        a          = mmutranslate_write(addr + 3);
+                        addr64a[i] = (uint32_t) a;
+                        if (!cpu_state.abrt) {
                             a          = (a & ~0xfffLL) | ((uint64_t) ((addr + i) & 0xfff));
                             addr64a[i] = (uint32_t) a;
                         }
-
-                        if (a > 0xffffffffULL)
-                            return;
+                    } else {
+                        a          = (a & ~0xfffLL) | ((uint64_t) ((addr + i) & 0xfff));
+                        addr64a[i] = (uint32_t) a;
                     }
+
+                    if (a > 0xffffffffULL)
+                        return;
                 }
             }
 
@@ -1538,28 +1536,27 @@ writememql(uint32_t addr, uint64_t val)
         cycles -= timing_misaligned;
         if ((addr & 0xfff) > 0xff8) {
             if (cr0 >> 31) {
+                /* Translate every page, including one with a page_lookup entry:
+                   writing the first half can recycle that entry (addwritelookup's
+                   ring), and the second half then falls back to addr64a[]. */
                 for (i = 0; i < 8; i++) {
-                    /* Do not translate a page that has a valid lookup, as that is by definition valid
-                       and the whole purpose of the lookup is to avoid repeat identical translations. */
-                    if (!page_lookup[(addr + i) >> 12] || !page_lookup[(addr + i) >> 12]->write_b) {
-                        if (i == 0) {
-                            a          = mmutranslate_write(addr + i);
-                            addr64a[i] = (uint32_t) a;
-                        } else if (!((addr + i) & 0xfff)) {
-                            a          = mmutranslate_write(addr + 7);
-                            addr64a[i] = (uint32_t) a;
-                            if (!cpu_state.abrt) {
-                                a          = (a & ~0xfffLL) | ((uint64_t) ((addr + i) & 0xfff));
-                                addr64a[i] = (uint32_t) a;
-                            }
-                        } else {
+                    if (i == 0) {
+                        a          = mmutranslate_write(addr + i);
+                        addr64a[i] = (uint32_t) a;
+                    } else if (!((addr + i) & 0xfff)) {
+                        a          = mmutranslate_write(addr + 7);
+                        addr64a[i] = (uint32_t) a;
+                        if (!cpu_state.abrt) {
                             a          = (a & ~0xfffLL) | ((uint64_t) ((addr + i) & 0xfff));
                             addr64a[i] = (uint32_t) a;
                         }
-
-                        if (addr64a[i] > 0xffffffffULL)
-                            return;
+                    } else {
+                        a          = (a & ~0xfffLL) | ((uint64_t) ((addr + i) & 0xfff));
+                        addr64a[i] = (uint32_t) a;
                     }
+
+                    if (addr64a[i] > 0xffffffffULL)
+                        return;
                 }
             }
 
